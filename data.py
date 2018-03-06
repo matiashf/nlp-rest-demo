@@ -55,10 +55,14 @@ def split(indices, period, iterable):
             j = (j + 1) % len(indices)
         i = (i + 1) % period
 
+class InvalidTextError(Exception):
+    """Thrown by prepare when no features can be extracted from the given text"""
+    pass
+
 def prepare(text, word_vectors, num_words):
     """Turn a single text into a 2D word embedding matrix (a vector for each word)
 
-    Raises ValueError if no word vectors could be found."""
+    Raises InvalidTextError if no word vectors could be found."""
 
     indices = np.zeros(num_words, dtype=np.uint32)
     # Extract word indices from text, which later can be used to look
@@ -73,7 +77,7 @@ def prepare(text, word_vectors, num_words):
         indices[-i] = index
         i += (index != 0) # Increment index if word was found
     if i == 1: # No word indices found?
-        raise KeyError(f"No vocabulary words in {text!r}")
+        raise InvalidTextError(f"No vocabulary words in {text!r}")
     else:
         return indices
 

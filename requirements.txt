@@ -7,3 +7,5 @@ keras
 requests
 matplotlib
 pandas
+gunicorn
+flask

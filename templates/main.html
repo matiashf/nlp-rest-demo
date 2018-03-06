@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Flaskr</title>
+  </head>
+<body>
+  <p>Please type something below</p>
+  <form action="{{ url_for('predict') }}" method="get">
+    <div>
+      <textarea name="text" required="true"></textarea>
+    </div>
+    <input type="submit" value="Predict sentiment" />
+  </form>
+</body>
