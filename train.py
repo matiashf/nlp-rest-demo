@@ -9,9 +9,10 @@ from multiprocessing import cpu_count
 import keras
 from keras.preprocessing.text import text_to_word_sequence
 from keras.utils import plot_model
+import h5py
 
 import data
-from model import make_model
+from model import make_model, MODEL_PATH
 
 def main():
     parser = argparse.ArgumentParser()
@@ -78,6 +79,14 @@ def main():
         use_multiprocessing=False, # TODO: Test speed of threads vs. processes
         shuffle=True, # TODO: Check if uses a lot of memory. If so, disable it.
         initial_epoch=0) # TODO: Allow resuming training at a later stage?
+
+    print(f"Saving model to {MODEL_PATH!r}...", end=' ', flush=True)
+    model.save(MODEL_PATH, )
+    # Save max vocab size alongside the model (we need it to load word vectors)
+    with h5py.File(MODEL_PATH, 'a') as f:
+        f.attrs['max_vocab_size'] = args.max_vocab_size
+        f.flush()
+    print("done.")
 
 if __name__ == '__main__':
     main()

@@ -1,6 +1,9 @@
+import os
 
 from keras.models import Sequential
 from keras.layers import InputLayer, Dense, Dropout, Embedding, LSTM, Bidirectional
+
+MODEL_PATH = os.path.join(os.path.dirname(__file__), 'model.h5')
 
 def make_model(num_words, word_vector_size):
     # The model below is based on
