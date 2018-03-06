@@ -55,6 +55,32 @@ def split(indices, period, iterable):
             j = (j + 1) % len(indices)
         i = (i + 1) % period
 
+def prepare(text, word_vectors, num_words):
+    """Turn a single text into a 2D word embedding matrix (a vector for each word)
+
+    Raises ValueError if no word vectors could be found."""
+
+    word_vector_size, = next(iter(word_vectors.values())).shape
+    vectors = np.zeros((num_words, word_vector_size))
+    # Extract word vectors from text. We start from the back to
+    # get pre-padding and pre-truncation. This plays (slightly)
+    # nicer with recurrent models.
+    i = 0 # Negative index into vectors, in range [0, num_words)
+    for word in reversed(text_to_word_sequence(text)):
+        if i == num_words:
+            break # Pre-truncate the rest of words (there were too many)
+        try:
+            vector = word_vectors[word]
+        except KeyError:
+            continue # Word did not have a vector. Go to the next word.
+        else:
+            vectors[-i] = vector
+            i += 1
+    if i == 0: # No word vectors found?
+        raise KeyError(f"No word vectors found for {text!r}")
+    else:
+        return vectors
+
 def batch(iterator, batch_size, num_words, word_vectors, dtype=np.float32):
     """Group together individual samples into batches of (features, labels)"""
 
@@ -66,24 +92,13 @@ def batch(iterator, batch_size, num_words, word_vectors, dtype=np.float32):
 
     i = 0
     for text, label in iterator:
-        # Extract word vectors from text. We start from the back to
-        # get pre-padding and pre-truncation. This plays (slightly)
-        # nicer with recurrent models.
-        words = text_to_word_sequence(text)
-        j = 0 # Negative index into the word dimension, i.e. j is in [0, num_words)
-        for k in range(len(words)): # Iterate over all words in the sample
-            word = words[-k]
-            try:
-                vector = word_vectors[word]
-            except KeyError:
-                continue # Word did not have a vector. Go to the next word.
-            features[i, -j] = vector
-            j += 1 # Advance to next available word in vector
-            if j == num_words:
-                break # Pre-truncate the rest of words (there were too many)
-        if j == 0:
-            continue # The sample contained no recognizable words. Skip it altogether
-        features[i, 0:j] = 0 # Pre-pad rest of words for this sample
+        # Prepare word embeddings
+        try:
+            vectors = prepare(text, word_vectors, num_words)
+        except KeyError:
+            continue # Sample did not contain any words in our vocabulary
+        else:
+            features[i] = vectors
 
         labels[i] = label
 
