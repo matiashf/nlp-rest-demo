@@ -26,6 +26,9 @@ def main():
     parser.add_argument('-e', '--epochs', type=int, default=1)
     parser.add_argument('-p', '--progress', action='store_true',
                         help="Show a progress bar")
+    parser.add_argument('--num-samples', type=int,
+                        help=("Limit the number of samples used for "
+                              "training and testing"))
     args = parser.parse_args()
 
     print('Loading word vectors...', end=' ', flush=True)
