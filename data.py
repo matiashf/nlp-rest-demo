@@ -125,7 +125,8 @@ def generators(train_ratio, test_ratio, batch_size, num_words, word_vectors,
     period = train_ratio + test_ratio
     random = np.random.RandomState(seed)
     train_indices = random.choice(period, size=train_ratio, replace=False)
-    test_indices = split(train_indices, period, range(period))
+    test_indices = set(range(period)) - set(train_indices)
+    assert test_indices.union(train_indices) == set(range(period))
 
     generate = partial(endless_batches, period=period, batch_size=batch_size,
                        num_words=num_words, word_vectors=word_vectors)
