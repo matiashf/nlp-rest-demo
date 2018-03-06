@@ -1,7 +1,7 @@
 import os
 import zipfile
 from copy import copy
-from collections import OrderedDict
+from collections import namedtuple
 from functools import partial
 
 import pandas as pd
@@ -60,45 +60,38 @@ def prepare(text, word_vectors, num_words):
 
     Raises ValueError if no word vectors could be found."""
 
-    word_vector_size, = next(iter(word_vectors.values())).shape
-    vectors = np.zeros((num_words, word_vector_size))
-    # Extract word vectors from text. We start from the back to
-    # get pre-padding and pre-truncation. This plays (slightly)
-    # nicer with recurrent models.
-    i = 0 # Negative index into vectors, in range [0, num_words)
+    indices = np.zeros(num_words, dtype=np.uint32)
+    # Extract word indices from text, which later can be used to look
+    # up word vectors. We start from the back to get pre-padding and
+    # pre-truncation. This plays (slightly) nicer with recurrent
+    # models.
+    i = 1 # Negative index into indices, in range [1, num_words]
     for word in reversed(text_to_word_sequence(text)):
-        if i == num_words:
+        if i == num_words + 1:
             break # Pre-truncate the rest of words (there were too many)
-        try:
-            vector = word_vectors[word]
-        except KeyError:
-            continue # Word did not have a vector. Go to the next word.
-        else:
-            vectors[-i] = vector
-            i += 1
-    if i == 0: # No word vectors found?
-        raise KeyError(f"No word vectors found for {text!r}")
+        index = word_vectors.indices.get(word, 0)
+        indices[-i] = index
+        i += (index != 0) # Increment index if word was found
+    if i == 1: # No word indices found?
+        raise KeyError(f"No vocabulary words in {text!r}")
     else:
-        return vectors
+        return indices
 
-def batch(iterator, batch_size, num_words, word_vectors, dtype=np.float32):
+def batch(iterator, batch_size, num_words, word_vectors):
     """Group together individual samples into batches of (features, labels)"""
 
-    # Create fixed size lists for additional speed. Append is
-    # potentially O(n) if realloc'ing, while setitem is always O(1).
-    vector_size, = next(iter(word_vectors.values())).shape
-    features = np.empty((batch_size, num_words, vector_size), dtype=dtype)
-    labels = np.empty(batch_size, dtype=dtype)
+    features = np.empty((batch_size, num_words), dtype=np.uint32)
+    labels = np.empty(batch_size, dtype=np.uint8)
 
     i = 0
     for text, label in iterator:
         # Prepare word embeddings
         try:
-            vectors = prepare(text, word_vectors, num_words)
+            word_indices = prepare(text, word_vectors, num_words)
         except KeyError:
             continue # Sample did not contain any words in our vocabulary
         else:
-            features[i] = vectors
+            features[i] = word_indices
 
         labels[i] = label
 
@@ -132,6 +125,8 @@ def generators(train_ratio, test_ratio, batch_size, num_words, word_vectors,
                        num_words=num_words, word_vectors=word_vectors)
     return generate(train_indices), generate(test_indices)
 
+WordVectors = namedtuple('WordVectors', ('words', 'indices', 'vectors'))
+
 word_vector_sizes = (50, 100, 200, 300)
 def get_word_vectors(max_vocab_size, vector_size):
     assert max_vocab_size > 0
@@ -145,13 +140,38 @@ def get_word_vectors(max_vocab_size, vector_size):
         extract=False,
     )
 
-    word_vectors = OrderedDict()
-    with zipfile.ZipFile(path) as zf:
-        for i, line in enumerate(zf.open(f"glove.6B.{vector_size}d.txt")):
-            if i == max_vocab_size:
-                break
-            # Adapted from https://github.com/keras-team/keras/blob/master/examples/pretrained_word_embeddings.py#L38
-            values = line.decode().split()
-            word_vectors[values[0]] = np.asarray(values[1:], dtype=np.float32)
+    word_vectors = WordVectors(
+        # For mapping index -> word (for debugging purposes)
+         # dtype object because we don't know the string length beforehand
+        words=np.empty((max_vocab_size + 1), dtype=object),
+        # For mapping word -> index
+        indices=dict(),
+        # For mapping index -> vector
+        vectors=np.empty((max_vocab_size + 1, vector_size),
+                         dtype=np.float32)
+    )
 
+    # Index zero is used for words not in the vocabulary
+    word_vectors.words[0] = None
+    word_vectors.vectors[0] = 0
+    word_vectors.indices[None] = 0
+
+    with zipfile.ZipFile(path) as zf:
+        i = 1
+        for line in zf.open(f"glove.6B.{vector_size}d.txt"):
+            if i == max_vocab_size + 1:
+                break
+            values = line.decode().split()
+            word = values[0]
+
+            if text_to_word_sequence(word) != [word]:
+                continue # Ignore punctuation words
+
+            vector = values[1:] # Don't turn into numpy array yet to avoid copying
+            word_vectors.words[i] = word
+            word_vectors.indices[word] = i
+            word_vectors.vectors[i] = vector
+            i += 1
+
+    assert len(word_vectors.indices) == max_vocab_size + 1
     return word_vectors

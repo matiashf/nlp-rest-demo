@@ -33,7 +33,7 @@ def main():
 
     print('Loading word vectors...', end=' ', flush=True)
     word_vectors = data.get_word_vectors(args.max_vocab_size, args.word_vector_size)
-    print(f'{len(word_vectors)} vectors loaded.')
+    print(f'{word_vectors.vectors.shape[0]} vectors loaded.')
 
     # Calculate test/train ratio, but allow the user to input a float
     # instead of two numbers for convenience. Scale so period ~
@@ -49,9 +49,7 @@ def main():
                                   num_words=args.num_words, word_vectors=word_vectors,
                                   batch_size=args.batch_size, seed=args.seed)
 
-    model = make_model(num_words=args.num_words,
-                       word_vector_size=args.word_vector_size)
-    model.compile('adam', 'binary_crossentropy', metrics=['accuracy'])
+    model = make_model(num_words=args.num_words, word_vectors=word_vectors)
 
     model_plot_filename = os.path.join(os.path.dirname(__file__), 'model.png')
     plot_model(model, to_file=model_plot_filename)
@@ -83,11 +81,13 @@ def main():
         shuffle=True, # TODO: Check if uses a lot of memory. If so, disable it.
         initial_epoch=0) # TODO: Allow resuming training at a later stage?
 
-    print(f"Saving model to {MODEL_PATH!r}...", end=' ', flush=True)
-    model.save(MODEL_PATH, )
+    print(f"Saving model weights to {MODEL_PATH!r}...", end=' ', flush=True)
+    model.save_weights(MODEL_PATH)
     # Save max vocab size alongside the model (we need it to load word vectors)
     with h5py.File(MODEL_PATH, 'a') as f:
         f.attrs['max_vocab_size'] = args.max_vocab_size
+        f.attrs['num_words'] = args.num_words
+        f.attrs['word_vector_size'] = args.word_vector_size
         f.flush()
     print("done.")
 
