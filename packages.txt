@@ -11,3 +11,4 @@ llvm
 libncurses5-dev
 libncursesw5-dev
 xz-utils tk-dev
+graphviz

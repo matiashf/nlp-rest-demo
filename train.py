@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import argparse
 import math
 import numpy as np
@@ -7,6 +8,7 @@ from multiprocessing import cpu_count
 
 import keras
 from keras.preprocessing.text import text_to_word_sequence
+from keras.utils import plot_model
 
 import data
 from model import make_model
@@ -46,6 +48,10 @@ def main():
     model = make_model(num_words=args.num_words,
                        word_vector_size=args.word_vector_size)
     model.compile('adam', 'binary_crossentropy', metrics=['accuracy'])
+
+    model_plot_filename = os.path.join(os.path.dirname(__file__), 'model.png')
+    plot_model(model, to_file=model_plot_filename)
+    print(f'Saved a plot of the model structure in {model_plot_filename!r}')
 
     if args.num_samples is None:
         # We need to load the data set once to see how many samples have
