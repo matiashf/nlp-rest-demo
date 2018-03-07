@@ -31,7 +31,7 @@ def test_make_model(word_vectors):
     make_model(num_words=15, word_vectors=word_vectors)
 
 def test_prepare(word_vectors):
-    with pytest.raises(KeyError):
+    with pytest.raises(data.InvalidTextError):
         data.prepare('', word_vectors, num_words=3)
 
     # Get the indices of some common words

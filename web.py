@@ -42,19 +42,23 @@ def predict():
     # TODO: Handle errors gracefully
     text = flask.request.args.get('text', type=str)
 
-    try:
-        features = data.prepare(text, word_vectors, num_words)
-    except data.InvalidTextError as e:
-        error = str(e)
+    if text is None:
+        error = "Missing required parameter 'text'"
         success = False
     else:
-        # Turn into a batch of one for prediction
-        with global_graph.as_default():
-            prediction = model.predict(features[np.newaxis, :], batch_size=1)
-        sentiment = ('negative', 'positive')[int(prediction.round())]
-        positivity_score = float(prediction)
-        words = word_vectors.words[features[features != 0]].tolist()
-        success = True
+        try:
+            features = data.prepare(text, word_vectors, num_words)
+        except data.InvalidTextError as e:
+            error = str(e)
+            success = False
+        else:
+            # Turn into a batch of one for prediction
+            with global_graph.as_default():
+                prediction = model.predict(features[np.newaxis, :], batch_size=1)
+            sentiment = ('negative', 'positive')[int(prediction.round())]
+            positivity_score = float(prediction)
+            words = word_vectors.words[features[features != 0]].tolist()
+            success = True
 
     allowed = set('text error success sentiment positivity_score words'.split())
     return flask.jsonify({k: v for k, v in locals().items() if k in allowed})
